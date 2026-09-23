@@ -39,33 +39,37 @@ module stduse
         module procedure :: iscomplex_zp
     endinterface iscomplex
 
+    interface sgn
+        module procedure :: sgn_sp
+        module procedure :: sgn_dp
+        module procedure :: sgn_i
+    endinterface sgn
+
     contains
 
-        pure elemental integer function sgn(x)
-            !
-            ! Returns the sign of x as an integer.
-            !
-            !     1 if x >= 0
-            !    -1 if x <  0
-            !
+        pure elemental integer function sgn_sp(x)
+            real(sp), intent(in) :: x
+
+            sgn_sp = int(sign(1.0_sp, x))
+        end function sgn_sp
+
+        pure elemental integer function sgn_dp(x)
             real(dp), intent(in) :: x
 
-            if (x .ge. 0.0_dp) then
-                sgn = 1
-            else
-                sgn = -1
-            endif
-        endfunction sgn
+            sgn_dp = int(sign(1.0_dp, x))
+        end function sgn_dp
+
+        pure elemental integer function sgn_i(x)
+            integer, intent(in) :: x
+
+            sgn_i = sign(1, x)
+        end function sgn_i
 
         pure elemental integer function del(i, j)
             integer, intent(in) :: i
             integer, intent(in) :: j
 
-            if (i .eq. j) then
-                del = 1
-            else
-                del = 0
-            endif
+            del = merge(1, 0, i .eq. j)
         endfunction del
 
         !
@@ -143,107 +147,139 @@ module stduse
             j = ieor(j, shiftl(j, 15))
         endfunction seed_function_dflt
 
-        subroutine print_dmatrix(A, ounit, message)
+        subroutine print_dmatrix(A, ounit, message, fmt)
             real(dp)        , intent(in)           :: A(:, :)
             integer         , intent(in)           :: ounit
             character(len=*), intent(in), optional :: message
+            character(len=*), intent(in), optional :: fmt
             
-            integer :: m, n, i, j
+            integer                       :: m, n, i, j
+            character(len=:), allocatable :: afmt
 
-            m = size(A, 1)
-            n = size(A, 2)
-
-            if (present(message)) then
-                write (ounit, "(a)") message
+            if (present(fmt)) then
+                afmt = fmt
+            else
+                afmt = dmatrixfmt
             endif
+
+            m = size(A, 1) ; n = size(A, 2)
+
+            if (present(message)) write (ounit, "(a)") message
 
             do i = 1, m
                 do j = 1, n
-                    write(unit=ounit, fmt=dmatrixfmt, advance="no") A(i, j)
+                    write(unit=ounit, fmt=afmt, advance="no") A(i, j)
                 enddo
                 write(unit=ounit, fmt="(a)") ""
             enddo
         endsubroutine print_dmatrix
 
-        subroutine print_dvector(v, ounit, advance)
-            real(dp), intent(in) :: v(:)
-            integer , intent(in) :: ounit
-            logical , optional   :: advance
+        subroutine print_dvector(v, ounit, message, advance, fmt)
+            real(dp)        , intent(in)           :: v(:)
+            integer         , intent(in)           :: ounit
+            character(len=*), intent(in), optional :: message
+            logical         , intent(in), optional :: advance
+            character(len=*), intent(in), optional :: fmt
             
-            integer :: m, i
-            logical :: adv
+            integer                       :: m, i
+            character(len=:), allocatable :: afmt
+            logical                       :: aadvance
 
             if (present(advance)) then
-                adv = advance
+                aadvance = advance
             else
-                adv = .false.
+                aadvance = .false.
+            endif
+
+            if (present(fmt)) then
+                afmt = fmt
+            else
+                afmt = dvectorfmt
             endif
 
             m = size(v)
 
-            if (adv) then
+            if (present(message)) write (ounit, "(a)") message
+
+            if (aadvance) then
                 do i = 1, m
-                    write(unit=ounit, fmt=dvectorfmt) v(i)
+                    write(unit=ounit, fmt=afmt) v(i)
                 enddo
             else
                 do i = 1, m
-                    write(unit=ounit, fmt=dvectorfmt, advance="no") v(i)
+                    write(unit=ounit, fmt=afmt, advance="no") v(i)
                 enddo
                 write(unit=ounit, fmt="(a)") ""
             endif
         endsubroutine print_dvector
 
-        subroutine print_ivector(v, ounit, advance)
-            integer, intent(in) :: v(:)
-            integer, intent(in) :: ounit
-            logical, optional   :: advance
+        subroutine print_ivector(v, ounit, message, advance, fmt)
+            integer         , intent(in)           :: v(:)
+            integer         , intent(in)           :: ounit
+            character(len=*), intent(in), optional :: message
+            logical         , intent(in), optional :: advance
+            character(len=*), intent(in), optional :: fmt
             
-            integer :: m, i
-            logical :: adv
+            integer                       :: m, i
+            character(len=:), allocatable :: afmt
+            logical                       :: aadvance
 
             if (present(advance)) then
-                adv = advance
+                aadvance = advance
             else
-                adv = .false.
+                aadvance = .false.
+            endif
+
+            if (present(fmt)) then
+                afmt = fmt
+            else
+                afmt = ivectorfmt
             endif
 
             m = size(v)
 
-            if (adv) then
+            if (present(message)) write (ounit, "(a)") message
+
+            if (aadvance) then
                 do i = 1, m
-                    write(unit=ounit, fmt=ivectorfmt) v(i)
+                    write(unit=ounit, fmt=afmt) v(i)
                 enddo
             else
                 do i = 1, m
-                    write(unit=ounit, fmt=ivectorfmt, advance="no") v(i)
+                    write(unit=ounit, fmt=afmt, advance="no") v(i)
                 enddo
                 write(unit=ounit, fmt="(a)") ""
             endif
         endsubroutine print_ivector
 
-        subroutine print_imatrix(A, ounit, message)
+        subroutine print_imatrix(A, ounit, message, fmt)
             integer         , intent(in)           :: A(:, :)
             integer         , intent(in)           :: ounit
             character(len=*), intent(in), optional :: message
+            character(len=*), intent(in), optional :: fmt
             
-            integer :: m, n, i, j
+            integer                       :: m, n, i, j
+            character(len=:), allocatable :: afmt
 
-            m = size(A, 1)
-            n = size(A, 2)
-
-            if (present(message)) then
-                write (ounit, "(a)") message
+            if (present(fmt)) then
+                afmt = fmt
+            else
+                afmt = imatrixfmt
             endif
+
+            m = size(A, 1) ; n = size(A, 2)
+
+            if (present(message)) write (ounit, "(a)") message
 
             do i = 1, m
                 do j = 1, n
-                    write(unit=ounit, fmt=imatrixfmt, advance="no") A(i, j)
+                    write(unit=ounit, fmt=afmt, advance="no") A(i, j)
                 enddo
-                write(ounit, "(a)") ""
+                write(unit=ounit, fmt="(a)") ""
             enddo
         endsubroutine print_imatrix
 
-                !> \brief Reads the next line from a file.
+        !> \brief Reads the next line from a file.
         !!
         !! Reminder: in Fortran, files are streams.
         !! So if a line is read from a file (eg, by using the `read` intrinsic)
@@ -304,7 +340,7 @@ module stduse
         function ltrim(line)
             character(len=*), intent(in) :: line
 
-            character(len=len(trim(adjustl(line)))) :: ltrim
+            character(len=:), allocatable :: ltrim
 
             ltrim = trim(adjustl(line))
         endfunction ltrim

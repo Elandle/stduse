@@ -1242,32 +1242,26 @@ module stdlinalg
             call dlacpy('A', n, n, A, n, B, n)
         endsubroutine copy_matrix
 
-        subroutine add_trans(A, B, n)
+        subroutine add_transpose(A, B)
             !
             ! Updates:
             !
-            ! A = A + trans(B)
+            ! A = A + transpose(B)
             !
-            ! where A and B are n x n matrices.
+            ! where A is m x n and B is n x m.
             !
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: B(n, n)
-            integer , intent(in)    :: n
+            real(dp), intent(inout) :: A(:, :)
+            real(dp), intent(in)    :: B(:, :)
 
-            integer :: i
+            integer :: m, n, j
 
-            ! Intel's MKL might have its own version of this operation
+            m = size(A, 1) ; n = size(A, 2)
 
-            ! BLAS:
-            do i = 1, n
-                call daxpy(n, 1.0_dp, B(i, 1), n, A(1, i), 1)
+            ! Intel's MKL might have something that does this, but this is more portable.
+            do j = 1, n
+                call daxpy(m, 1.0_dp, B(j, 1), size(B, 1), A(1, j), 1)
             enddo
-
-            ! No BLAS:
-            ! do i = 1, n
-            !     A(:, i) = A(:, i) + B(i, :)
-            ! enddo
-        endsubroutine add_trans
+        end subroutine add_transpose
 
         subroutine add_matrix(A, B, n)
             !
