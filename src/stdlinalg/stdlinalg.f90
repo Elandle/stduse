@@ -24,12 +24,75 @@ module stdlinalg
     endinterface append_column
 
 
+    ! stdlinalg_matexp submodule interfaces ------------------------------
+    interface gpadm
+        module subroutine dgpadm(ideg, m, t, H, ldh, wsp, lwsp, ipiv, iexph, ns, iflag)
+            integer  :: ideg, m, ldh, lwsp, iexph, ns, iflag, ipiv(m)
+            real(dp) :: t, H(ldh,m), wsp(lwsp)
+        endsubroutine dgpadm
+    endinterface gpadm
+    
+    interface expm
+        module subroutine dexpm(A, exptA, t, ideg)
+            real(dp), intent(in)  :: A(:, :)
+            real(dp), intent(out) :: exptA(size(A, 1), size(A, 1))
+            real(dp), optional    :: t
+            integer , optional    :: ideg
+        endsubroutine dexpm
+    endinterface expm
+    ! ---------------------------------------------------------------------
+
+    ! stdlinalg_permutations submodule interfaces ------------------------
+
+    interface invert_permutation
+        module subroutine invert_permutation(P)
+            integer, intent(inout) :: P(:)
+        endsubroutine invert_permutation
+    endinterface
+
+    interface colpivswap
+        module subroutine colpivswap_dp(A, piv, n, matwork)
+            real(dp), intent(inout) :: A(n, n)
+            integer , intent(in)    :: piv(n)
+            integer , intent(in)    :: n
+            real(dp), intent(out)   :: matwork(n, n)
+        endsubroutine colpivswap_dp
+    endinterface
+
+    ! ---------------------------------------------------------------------
 
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ! -----------------------------------------------------------------------------------------------------
+    ! -----------------------------------------------------------------------------------------------------
+    ! BLAS and LAPACK interfaces --------------------------------------------------------------------------
+    ! -----------------------------------------------------------------------------------------------------
+    ! -----------------------------------------------------------------------------------------------------
 
     ! -----------------------------------------------------------------------------------------------------
     ! Scalar operations -----------------------------------------------------------------------------------
@@ -484,231 +547,6 @@ module stdlinalg
 
     contains
 
-        !> Adapted from the expokit subroutine dgpadm
-        !!
-        !! -----Purpose----------------------------------------------------------|
-        !!
-        !!      Computes exp(t*H), the matrix exponential of a general matrix in
-        !!      full, using the irreducible rational Pade approximation to the 
-        !!      exponential function exp(x) = r(x) = (+/-)( I + 2*(q(x)/p(x)) ),
-        !!      combined with scaling-and-squaring.
-        !!
-        !! -----Arguments--------------------------------------------------------|
-        !!
-        !!      ideg           : (input) the degre of the diagonal Pade to be used.
-        !!                               a value of 6 is generally satisfactory.
-        !!
-        !!      m              : (input) order of H.
-        !!
-        !!      H(ldh,m)       : (input) argument matrix.
-        !!
-        !!      t              : (input) time-scale (can be < 0).
-        !!                  
-        !!      wsp(lwsp)      : (workspace/output) lwsp .ge. 4*m*m+ ideg+1.
-        !!
-        !!      ipiv(m)        : (workspace)
-        !!
-        !!      >>>> iexph     : (output) number such that wsp(iexph) points to exp(tH)
-        !!                                i.e., exp(tH) is located at wsp(iexph ... iexph+m*m-1)
-        !!                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        !!                                NOTE: if the routine was called with wsp(iptr), 
-        !!                                      then exp(tH) will start at wsp(iptr+iexph-1).
-        !!
-        !!      ns             : (output) number of scaling-squaring used.
-        !!
-        !!      iflag          : (output) exit flag.
-        !!                                 0 - no problem
-        !!                                <0 - problem
-        !!
-        !! ----------------------------------------------------------------------|
-        !!
-        !! Roger B. Sidje (rbs@maths.uq.edu.au)
-        !!
-        !! EXPOKIT: Software Package for Computing Matrix Exponentials.
-        !!
-        !! ACM - Transactions On Mathematical Software, 24(1):130-156, 1998
-        !!
-        !! ----------------------------------------------------------------------|
-        subroutine dgpadm(ideg, m, t, H, ldh, wsp, lwsp, ipiv, iexph, ns, iflag)
-            integer  :: ideg, m, ldh, lwsp, iexph, ns, iflag, ipiv(m)
-            real(dp) :: t, H(ldh,m), wsp(lwsp)
-            integer  :: mm, i, j, k, ih2, ip, iq, iused, ifree, iodd, icoef, iput, iget
-            real(dp) :: hnorm, scale, scale2, cp, cq
-
-            ! intrinsic INT,ABS,DBLE,LOG,MAX
-
-            ! ---  check restrictions on input parameters ...
-            mm = m * m
-            iflag = 0
-            if (ldh .lt. m) iflag = -1
-            if (lwsp .lt. 4*mm + ideg+1 ) iflag = -2
-            if (iflag .ne. 0 ) stop "bad sizes (in input of dgpadm)"
-            !
-            ! ---  initialise pointers ...
-            !
-            icoef = 1
-            ih2 = icoef + (ideg+1)
-            ip  = ih2 + mm
-            iq  = ip + mm
-            ifree = iq + mm
-            !
-            ! ---  scaling: seek ns such that ||t*H/2^ns|| < 1/2; 
-            !      and set scale = t/2^ns ...
-            !
-            do i = 1, m
-                wsp(i) = 0.0_dp
-            enddo
-
-            do j = 1, m
-                do i = 1, m
-                    wsp(i) = wsp(i) + abs(H(i, j))
-                enddo
-            enddo
-
-            hnorm = 0.0_dp
-            do i = 1, m
-                hnorm = max(hnorm, wsp(i))
-            enddo
-            hnorm = abs(t * hnorm)
-
-            if (hnorm .eq. 0.0_dp) stop "Error - null H in input of dgpadm."
-            ns = max(0, int(log(hnorm)/log(2.0_dp)) + 2)
-            scale = t / real(2 ** ns, dp)
-            scale2 = scale * scale
-            !
-            ! ---  compute Pade coefficients ...
-            !
-            i = ideg + 1
-            j = 2*ideg + 1
-            wsp(icoef) = 1.0_dp
-            do k = 1, ideg
-                wsp(icoef+k) = (wsp(icoef+k-1) * real(i-k, dp)) / real(k*(j-k), dp)
-            enddo
-            !
-            ! ---  H2 = scale2 * H * H ...
-            !
-            call dgemm('n', 'n', m, m, m, scale2, H, ldh, H, ldh, 0.0_dp, wsp(ih2), m)
-            !
-            ! ---  initialize p (numerator) and q (denominator) ...
-            !
-            cp = wsp(icoef+ideg-1)
-            cq = wsp(icoef+ideg)
-            do j = 1, m
-                do i = 1, m
-                    wsp(ip + (j-1)*m + i-1) = 0.0_dp
-                    wsp(iq + (j-1)*m + i-1) = 0.0_dp
-                enddo
-                wsp(ip + (j-1)*(m+1)) = cp
-                wsp(iq + (j-1)*(m+1)) = cq
-            enddo
-            !
-            ! ---  Apply Horner rule ...
-            !
-            iodd = 1
-            k = ideg - 1
-100         continue
-            iused = iodd*iq + (1-iodd)*ip
-            call dgemm('n', 'n', m, m, m, 1.0_dp, wsp(iused), m, wsp(ih2), m, 0.0_dp, wsp(ifree), m)
-            do j = 1, m
-                wsp(ifree+(j-1)*(m+1)) = wsp(ifree + (j-1)*(m+1)) + wsp(icoef + k-1)
-            enddo
-            ip = (1-iodd)*ifree + iodd*ip
-            iq = iodd*ifree + (1-iodd)*iq
-            ifree = iused
-            iodd = 1-iodd
-            k = k-1
-            if (k .gt. 0)  goto 100
-            !
-            ! ---  Obtain (+/-)(I + 2*(p\q)) ...
-            !
-            if (iodd .eq. 1) then
-                call dgemm('n', 'n', m, m, m, scale, wsp(iq), m, H, ldh, 0.0_dp, wsp(ifree), m)
-                iq = ifree
-            else
-                call dgemm('n', 'n', m, m, m, scale, wsp(ip), m, H, ldh, 0.0_dp, wsp(ifree), m)
-                ip = ifree
-            endif
-            call daxpy(mm, -1.0_dp, wsp(ip), 1, wsp(iq), 1)
-            call dgesv(m, m, wsp(iq), m, ipiv, wsp(ip), m, iflag)
-            if (iflag .ne. 0) stop "Problem in dgesv (within dgpadm)"
-            call dscal(mm, 2.0_dp, wsp(ip), 1)
-            do j = 1, m
-                wsp(ip + (j-1)*(m+1)) = wsp(ip + (j-1)*(m+1)) + 1.0_dp
-            enddo
-            iput = ip
-            if (ns .eq. 0 .and. iodd .eq.1) then
-                call dscal(mm, -1.0_dp, wsp(ip), 1)
-                goto 200
-            endif
-            !
-            ! --   squaring : exp(t*H) = (exp(t*H))^(2^ns) ...
-            !
-            iodd = 1
-            do k = 1, ns
-                iget = iodd*ip + (1-iodd)*iq
-                iput = (1-iodd)*ip + iodd*iq
-                call dgemm('n', 'n', m, m, m, 1.0_dp, wsp(iget), m, wsp(iget), m, 0.0_dp, wsp(iput), m)
-                iodd = 1 - iodd
-            enddo
-200         continue
-            iexph = iput
-        endsubroutine dgpadm
-        ! ----------------------------------------------------------------------|
-
-
-        !> Convenient form of EXPOKIT's `dgpadm` (not good for heavy use).
-        !!
-        !! Sets `exptA = exp(t*A)` with `A` unmodified using a degree `ideg`
-        !! Pade approximant in EXPOKIT's `dgpadm`.
-        !! `t` and `ideg` are optional.
-        !! By default `t = 1` and `ideg = 6` (a typical `ideg` value suggest by EXPOKIT).
-        !!
-        !! \param[in]  A     (`real(dp), dimension(:, :)`)                   Matrix to diagonalize (should be square `size(A, 1) = size(A, 2)`).
-        !! \param[out] exptA (`real(dp), dimension(size(A, 2), size(A, 2))`) Matrix to hold computed `exp(t*A)`.
-        !! \param[in]  t     (`real(dp), optional`)                          Scalar `t` in `exp(t*A)`. Default value: `1`.
-        !! \param[in]  ideg  (`integer, optional`)                           Degree of Pade approximant to use in `dgpadm`. Default value: `6`.
-        subroutine expm(A, exptA, t, ideg)
-            real(dp), intent(in)  :: A(:, :)
-            real(dp), intent(out) :: exptA(size(A, 2), size(A, 2))
-            real(dp), optional    :: t
-            integer , optional    :: ideg
-
-            integer  :: m
-            integer  :: lda
-            integer  :: lwsp
-            integer  :: iflag
-            integer  :: ns
-            integer  :: iexpa
-            integer  :: ipiv(size(A, 2))
-            real(dp) :: ta
-            integer  :: idega
-            real(dp), allocatable :: wsp(:)
-
-            if (present(t)) then
-                ta = t
-            else
-                ta = 1.0_dp
-            endif
-
-            if (present(ideg)) then
-                idega = ideg
-            else
-                idega = 6
-            endif
-            
-            lda = size(A, 1)
-            m = size(A, 2)
-            lwsp = 4*m*m + idega+1    + 4*m*m
-            iflag = 0
-            ns = 0
-            allocate(wsp(lwsp))
-
-            call dgpadm(idega, m, ta, A, lda, wsp, lwsp, ipiv, iexpa, ns, iflag)
-            call dcopy(m*m, wsp(iexpa), 1, exptA, 1)
-
-            deallocate(wsp)
-        endsubroutine expm
-
         real(dp) function twonorm(A) result(norm)
             !
             ! Returns the 2 norm of the matrix A
@@ -744,17 +582,33 @@ module stdlinalg
         !! \param[in]    D (`real(dp), dimension(n)`)    Diagonal matrix \f$D\f$ stored as a vector.
         !! \param[in]    n (`integer`)                   Dimension of \f$A\f$ and \f$D\f$.
         !! \see Todo: maybe change the `do` to a `do concurrent`?
-        subroutine right_diagmult(A, D, n)
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: D(n)
-            integer , intent(in)    :: n
+        subroutine right_diagmult(A, D)
+            !
+            ! Updates:
+            !
+            ! A = A * diag(D)
+            !
+            ! where A is an m x n matrix and D is an n-long vector.
+            !
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: D(:)
 
-            integer :: i
+            call right_diagmult_helper(A, D, size(A, 1), size(A, 2))
 
-            ! Scale column i of A by D(i)
-            do i = 1, n
-                call dscal(n, D(i), A(1, i), 1)
-            enddo
+        contains
+            subroutine right_diagmult_helper(A, D, m, n)
+                integer , intent(in)    :: m
+                integer , intent(in)    :: n
+                real(dp), intent(inout) :: A(m, n)
+                real(dp), intent(in)    :: D(n)
+
+                integer :: i
+
+                ! Scale column i of A by D(i)
+                do i = 1, n
+                    call dscal(m, D(i), A(1, i), 1)
+                enddo
+            endsubroutine right_diagmult_helper
         endsubroutine right_diagmult
 
         !> \brief Updates \f$A = DA\f$ for a square matrix \f$A\f$ and diagonal matrix \f$D\f$ stored as a vector.
@@ -765,22 +619,35 @@ module stdlinalg
         !! \see Todo: maybe change the `do` to a `do concurrent`? </p>
         !! Some BLAS/LAPACK distributions contain the `dlascl2` subroutine and some do not.
         !! `dlascl2` should be used if possible. If not, provided alternative code can be used.
-        subroutine left_diagmult(A, D, n)
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: D(n)
-            integer , intent(in)    :: n
+        subroutine left_diagmult(A, D)
+            !
+            ! Updates:
+            !
+            ! A = diag(D) * A
+            !
+            ! where A is an m x n matrix and D is an m-long vector.
+            !
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: D(:)
 
-            ! For some reason, it seems only some BLAS/LAPACK distributions contain the dlascl2 subroutine
-            
-            ! BEST
-            ! call dlascl2(n, n, D, A, n)
+            call left_diagmult_helper(A, D, size(A, 1), size(A, 2))
+        contains
+            subroutine left_diagmult_helper(A, D, m, n)
+                integer , intent(in)    :: m
+                integer , intent(in)    :: n
+                real(dp), intent(inout) :: A(m, n)
+                real(dp), intent(in)    :: D(m)
 
-            ! SECOND BEST
-            integer :: i
-            ! Scale row i of A by D(i)
-            do i = 1, n
-                call dscal(n, D(i), A(i, 1), n)
-            enddo
+                integer :: i
+
+                ! 
+                ! call dlascl2(m, n, D, A, m)
+
+                ! Scale row i of A by D(i)
+                do i = 1, m
+                    call dscal(n, D(i), A(i, 1), m)
+                enddo
+            endsubroutine left_diagmult_helper
         endsubroutine left_diagmult
 
         !> \brief Updates \f$A = AD^{-1}\f$ for a square matrix \f$A\f$ and diagonal matrix \f$D\f$ stored as a vector.
@@ -791,17 +658,32 @@ module stdlinalg
         !! \see Todo: maybe change the `do` to a `do concurrent`? </p>
         !! This code does not check if \f$D\f$ has all nonzero diagonal entries (in which case
         !! \f$D^{-1}\f$ does not exist).
-        subroutine right_diaginvmult(A, D, n)
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: D(n)
-            integer , intent(in)    :: n
+        subroutine right_diaginvmult(A, D)
+            !
+            ! Updates:
+            !
+            ! A = A * inv(diag(D))
+            !
+            ! where A is an m x n matrix and D is an n-long vector.
+            !
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: D(:)
 
-            integer :: i
+            call right_diaginvmult_helper(A, D, size(A, 1), size(A, 2))
+        contains
+            subroutine right_diaginvmult_helper(A, D, m, n)
+                integer , intent(in)    :: m
+                integer , intent(in)    :: n
+                real(dp), intent(inout) :: A(m, n)
+                real(dp), intent(in)    :: D(n)
 
-            ! Scale column i of A by 1/D(i)
-            do i = 1, n
-                call dscal(n, 1.0_dp / D(i), A(1, i), 1)
-            enddo
+                integer :: i
+
+                ! Scale column i of A by 1/D(i)
+                do i = 1, n
+                    call dscal(m, 1.0_dp / D(i), A(1, i), 1)
+                enddo
+            endsubroutine right_diaginvmult_helper
         endsubroutine right_diaginvmult
 
         !> \brief Updates \f$A = D^{-1}A\f$ for a square matrix \f$A\f$ and diagonal matrix \f$D\f$ stored as a vector.
@@ -814,22 +696,34 @@ module stdlinalg
         !! \f$D^{-1}\f$ does not exist).
         !! Some BLAS/LAPACK distributions contain the `dlascl2` subroutine and some do not.
         !! `dlascl2` should be used if possible. If not, provided alternative code can be used.
-        subroutine left_diaginvmult(A, D, n)
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: D(n)
-            integer , intent(in)    :: n
+        subroutine left_diaginvmult(A, D)
+            !
+            ! Updates:
+            !
+            ! A = inv(diag(D)) * A
+            !
+            ! where A is an m x n matrix and D is an m-vector.
+            !
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: D(:)
 
-            ! For some reason, it seems only some BLAS/LAPACK distributions contain the dlascl2 subroutine
+            call left_diaginvmult_helper(A, D, size(A, 1), size(A, 2))
+        contains
+            subroutine left_diaginvmult_helper(A, D, m, n)
+                integer , intent(in)    :: m
+                integer , intent(in)    :: n
+                real(dp), intent(inout) :: A(m, n)
+                real(dp), intent(in)    :: D(m)
 
-            ! BEST
-            ! call dlarscl2(n, n, D, A, n)
+                integer :: i
 
-            ! SECOND BEST
-            integer :: i
-            ! Scale row i of A by 1/D(i)
-            do i = 1, n
-                call dscal(n, 1.0_dp / D(i), A(i, 1), n)
-            enddo
+                ! call dlarscl2(m, n, D, A, m)
+
+                ! Scale row i of A by 1/D(i)
+                do i = 1, m
+                    call dscal(n, 1.0_dp / D(i), A(i, 1), m)
+                enddo
+            endsubroutine left_diaginvmult_helper
         endsubroutine left_diaginvmult
 
         !> \brief Sets \f$D = \text{diag}(A)\f$ for a square matrix \f$A\f$ and diagonal matrix \f$D\f$ stored as a vector.
@@ -837,19 +731,34 @@ module stdlinalg
         !! \param[inout] A (`real(dp), dimension(n, n)`) \f$n\times n\f$ matrix \f$A\f$ to update.
         !! \param[in]    D (`real(dp), dimension(n)`)    Diagonal matrix \f$D\f$ stored as a vector.
         !! \param[in]    n (`integer`)                   Dimension of \f$A\f$ and \f$D\f$.
-        subroutine diag(A, D, n)
-            real(dp), intent(in)  :: A(n, n)
-            real(dp), intent(out) :: D(n)
-            integer , intent(in)  :: n
+        subroutine diag(A, D)
+            !
+            ! Sets:
+            !
+            ! D = diagonal(A)
+            !
+            ! where A is an m x n matrix and D has length min(m, n).
+            !
+            real(dp), contiguous, intent(in)  :: A(:, :)
+            real(dp), contiguous, intent(out) :: D(:)
 
-            integer :: i
+            call diag_helper(A, D, size(A, 1), size(A, 2))
+        contains
+            subroutine diag_helper(A, D, m, n)
+                integer , intent(in)  :: m
+                integer , intent(in)  :: n
+                real(dp), intent(in)  :: A(m, n)
+                real(dp), intent(out) :: D(min(m, n))
 
-            do concurrent (i = 1 : n)
-                D(i) = A(i, i)
-            enddo
+                integer :: i
+
+                do concurrent (i = 1 : min(m, n))
+                    D(i) = A(i, i)
+                enddo
+            endsubroutine diag_helper
         endsubroutine diag
 
-        subroutine uppertri(A, B, n)
+        subroutine uppertri(A, B)
             !
             ! Sets:
             !
@@ -858,15 +767,23 @@ module stdlinalg
             ! That is, B is set to be the upper triangular part of A (including the diagonal),
             ! with all other entries set to zero.
             !
-            real(dp), intent(in)  :: A(n, n)
-            real(dp), intent(out) :: B(n, n)
-            integer , intent(in)  :: n
+            real(dp), contiguous, intent(in)  :: A(:, :)
+            real(dp), contiguous, intent(out) :: B(:, :)
 
-            ! Zero the lower triangular part of B (including the diagonal)
-            call dlaset('L', N, N, 0.0_dp, 0.0_dp, B, N)
+            call uppertri_helper(A, B, size(A, 1), size(A, 2))
+        contains
+            subroutine uppertri_helper(A, B, m, n)
+                integer , intent(in)  :: m
+                integer , intent(in)  :: n
+                real(dp), intent(in)  :: A(m, n)
+                real(dp), intent(out) :: B(m, n)
 
-            ! Copy the upper triangular part of A (including the diagonal) to B
-            call dlacpy('U', N, N, A, N, B, N)
+                ! Zero the lower triangular part of B (including the diagonal)
+                call dlaset('L', m, n, 0.0_dp, 0.0_dp, B, m)
+
+                ! Copy the upper triangular part of A (including the diagonal) to B
+                call dlacpy('U', m, n, A, m, B, m)
+            endsubroutine uppertri_helper
         endsubroutine uppertri
 
         
@@ -891,48 +808,6 @@ module stdlinalg
             ! Maybe:
             ! I(P) = [(j, j = 1, n)]
         endsubroutine invert_permutation_old
-
-        subroutine invert_permutation(P, n)
-            ! Knuth, The Art of Computer Programming, Volume 1
-            ! Section 1.3.3, algorithm I
-            integer, intent(inout) :: P(n)
-            integer, intent(in)    :: n
-
-            integer :: m, j, i
-
-            ! I1
-            m = n
-            j = -1
-
-            ! I2
-20          i = P(m)
-            if (i .lt. 0) then
-                goto 50
-            endif
-
-            ! I3
-30          P(m) = j
-            j = -m
-            m = i
-            i = P(m)
-
-            ! I4
-            if (i .gt. 0) then
-                goto 30
-            else
-                i = j
-            endif
-
-            ! I5
-50          P(m) = -i
-
-            ! I6
-            m = m - 1
-            if (m .gt. 0) then
-                goto 20
-            endif
-        endsubroutine invert_permutation
-
         
         subroutine permutecols(A, P, n)
             !
@@ -1228,18 +1103,26 @@ module stdlinalg
             call dlaset('A', n, n, 0.0_dp, 0.0_dp, A, n)
         endsubroutine zero_matrix
 
-        !> Copies \f$B = A\f$, where \f$A\f$ and \f$B\f$ are both \f$n\times n\f$ square matrices.
+        !> Copies \f$A = B\f$, where \f$A\f$ and \f$B\f$ are both \f$m\times n\f$ matrices.
         !!
-        !! \param[in]  A  (`real(dp), dimension(n, n)`) Square matrix to copy.
-        !! \param[out] B  (`real(dp), dimension(n, n)`) Square matrix to copy into.
-        !! \param[in]  n  (`integer`)                   Dimension of `A` and `B`.
-        subroutine copy_matrix(A, B, n)
-            real(dp), intent(in)  :: A(n, n)
-            real(dp), intent(out) :: B(n, n)
-            integer , intent(in)  :: n
+        !! \param[out]  A  (`real(dp), dimension(:, :)`) Matrix to copy into.
+        !! \param[in]   B  (`real(dp), dimension(size(A, 1), size(A, 2))`) Matrix to copy from.
+        subroutine copy_matrix(A, B)
+            real(dp), intent(out) :: A(:, :)
+            real(dp), intent(in)  :: B(:, :)
 
-            ! B = A
-            call dlacpy('A', n, n, A, n, B, n)
+            call copy_matrix_helper(A, B, size(A, 1), size(A, 2))
+
+            contains
+                subroutine copy_matrix_helper(A, B, m, n)
+                    integer , intent(in)  :: m
+                    integer , intent(in)  :: n
+                    real(dp), intent(out) :: A(m, n)
+                    real(dp), intent(in)  :: B(m, n)
+
+                    ! A = B
+                    call dlacpy('A', m, n, B, m, A, m)
+                endsubroutine copy_matrix_helper
         endsubroutine copy_matrix
 
         subroutine add_transpose(A, B)
@@ -1250,114 +1133,132 @@ module stdlinalg
             !
             ! where A is m x n and B is n x m.
             !
-            real(dp), intent(inout) :: A(:, :)
-            real(dp), intent(in)    :: B(:, :)
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: B(:, :)
 
-            integer :: m, n, j
+            call add_transpose_helper(A, B, size(A, 1), size(A, 2))
+            
+            contains
+                subroutine add_transpose_helper(A, B, m, n)
+                    integer , intent(in)    :: m
+                    integer , intent(in)    :: n
+                    real(dp), intent(inout) :: A(m, n)
+                    real(dp), intent(in)    :: B(n, m)
 
-            m = size(A, 1) ; n = size(A, 2)
+                    integer :: j
 
-            ! Intel's MKL might have something that does this, but this is more portable.
-            do j = 1, n
-                call daxpy(m, 1.0_dp, B(j, 1), size(B, 1), A(1, j), 1)
-            enddo
+                    ! Intel's MKL might have something that does this, but this is more portable.
+                    do j = 1, n
+                        call daxpy(m, 1.0_dp, B(j, 1), size(B, 1), A(1, j), 1)
+                    enddo
+                endsubroutine add_transpose_helper
         end subroutine add_transpose
 
-        subroutine add_matrix(A, B, n)
+        subroutine add_matrix(A, B)
             !
             ! Updates:
             !
             ! A = A + B
             !
-            ! where A and B are n x n matrices
+            ! where A and B are m x n matrices
             !
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: B(n, n)
-            integer , intent(in)    :: n
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: B(:, :)
 
-            ! BLAS:
-            call daxpy(n*n, 1.0_dp, B, 1, A, 1)
+            call add_matrix_helper(A, B, size(A, 1), size(A, 2))
 
-            ! No BLAS:
-            ! integer :: i, j
-            ! do j = 1, n
-            !     do i = 1, n
-            !         A(i, j) = A(i, j) + B(i, j)
-            !     enddo
-            ! enddo
+            contains
+                subroutine add_matrix_helper(A, B, m, n)
+                    integer , intent(in)    :: m
+                    integer , intent(in)    :: n
+                    real(dp), intent(inout) :: A(m, n)
+                    real(dp), intent(in)    :: B(m, n)
+
+                    call daxpy(size(A, 1) * size(A, 2), 1.0_dp, B, 1, A, 1)
+                endsubroutine add_matrix_helper
         endsubroutine add_matrix
 
-        subroutine left_matmul(A, B, n, work)
+        subroutine left_matmul(A, B, work)
             !
             ! Updates:
             !
             ! A = B * A
             !
-            ! where A and B are n x n matrices.
+            ! where A is an m x n matrix and B an m x m matrix (so the result can still be stored in A).
+            ! work is a workspace array (any dimensional, eg 1 or 2 as long as it has enough space)
+            ! at least m * n long.
             !
-            ! Uses a supplied work matrix to hold a temporary copy of A (since
-            ! there is no A = B * A general matrix update routine in BLAS/LAPACK).
-            !
-            ! This subroutine should be avoided at all costs, but it might be
-            ! necessary to use at times.
-            !
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: B(n, n)
-            integer , intent(in)    :: n
-            real(dp), intent(out)   :: work(n, n)
-            
-            ! work = A
-            call dlacpy('a', N, N, A, N, work, N)
-            ! A = B * work
-            call dgemm('n', 'n', N, N, N, 1.0_dp, B, N, work, N, 0.0_dp, A, N)
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: B(:, :)
+            real(dp), contiguous, intent(out)   :: work(:)
+
+            call left_matmul_helper(A, B, work, size(A, 1), size(A, 2))
+        contains
+            subroutine left_matmul_helper(A, B, work, m, n)
+                integer , intent(in)    :: m
+                integer , intent(in)    :: n
+                real(dp), intent(inout) :: A(m, n)
+                real(dp), intent(in)    :: B(m, m)
+                real(dp), intent(out)   :: work(m*n)
+
+                ! work = A
+                call dlacpy('a', m, n, A, m, work, m)
+
+                ! A = B * work
+                call dgemm('n', 'n', m, n, m, 1.0_dp, B, m, work, m, 0.0_dp, A, m)
+            endsubroutine left_matmul_helper
         endsubroutine left_matmul
 
-        subroutine right_matmul(A, B, n, work)
+        subroutine right_matmul(A, B, work)
             !
             ! Updates:
             !
             ! A = A * B
             !
-            ! where A and B are n x n matrices.
+            ! where A is an m x n matrix and B an n x n matrix (so the result can still be stored in A).
+            ! work is a workspace array (any dimensional, eg 1 or 2 as long as it has enough space)
+            ! at least m * n long.
             !
-            ! Uses a supplied work matrix to hold a temporary copy of A (since
-            ! there is no A = A * B general matrix update routine in BLAS/LAPACK).
-            !
-            ! This subroutine should be avoided at all costs, but it might be
-            ! necessary to use at times.
-            !
-            real(dp), intent(inout) :: A(n, n)
-            real(dp), intent(in)    :: B(n, n)
-            integer , intent(in)    :: n
-            real(dp), intent(out)   :: work(n, n)
-            
-            ! work = A
-            call dlacpy('a', N, N, A, N, work, N)
-            ! A = work * B
-            call dgemm('n', 'n', N, N, N, 1.0_dp, work, N, B, N, 0.0_dp, A, N)
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: B(:, :)
+            real(dp), contiguous, intent(out)   :: work(:)
+
+            call right_matmul_helper(A, B, work, size(A, 1), size(A, 2))
+        contains
+            subroutine right_matmul_helper(A, B, work, m, n)
+                integer , intent(in)    :: m
+                integer , intent(in)    :: n
+                real(dp), intent(inout) :: A(m, n)
+                real(dp), intent(in)    :: B(n, n)
+                real(dp), intent(out)   :: work(m*n)
+
+                ! work = A
+                call dlacpy('a', m, n, A, m, work, m)
+
+                ! A = work * B
+                call dgemm('n', 'n', m, n, n, 1.0_dp, work, m, B, n, 0.0_dp, A, m)
+            endsubroutine right_matmul_helper
         endsubroutine right_matmul
 
-        subroutine trans(A, B, n)
+        subroutine transpose(A, B)
             !
-            ! Sets:
+            ! Sets A to the transpose of B.
             !
-            ! A = trans(B)
-            !
-            real(dp), intent(out) :: A(n, n)
-            real(dp), intent(in)  :: B(n, n)
-            integer , intent(in)  :: n
+            real(dp), intent(out) :: A(:, :)
+            real(dp), intent(in)  :: B(size(A, 2), size(A, 1))
 
-            integer :: i
-            integer :: j
+            integer :: i, j, m, n
 
-            ! TODO: see if BLAS/LAPACK can be implemented
+            m = size(A, 1) ; n = size(A, 2)
+
+            ! I believe Intel's MKL has something for this.
 
             do j = 1, n
                 do i = 1, n
                     A(i, j) = B(j, i)
                 enddo
             enddo
-        endsubroutine trans
+        endsubroutine transpose
 
         subroutine dlaswpc(n, a, lda, k1, k2, ipiv, incx)
             !
@@ -1438,43 +1339,6 @@ module stdlinalg
             !     End of DLASWP
             !
         endsubroutine dlaswpc
-
-
-        subroutine colpivswap(A, piv, n, matwork)
-            !
-            ! Swaps the columns of the n x n matrix A according to the n
-            ! long integer vector piv
-            !
-            ! If piv(i) = k, then column i of A becomes column k of A
-            !
-            ! In other words, for i = 1, 2, ..., n:
-            !
-            !       A(:, piv(i)) = A(:, i)
-            !
-            ! Where this replacement is done independently (changes where
-            ! columns are do not affect other column changes)
-            !
-            real(dp), intent(inout) :: A(n, n)
-            integer , intent(in)    :: piv(n)
-            integer , intent(in)    :: n
-            real(dp), intent(out)   :: matwork(n, n)
-
-            integer i
-
-            !
-            ! TODO:
-            ! Can this be done without copying A?
-            !
-
-            call copy_matrix(A, matwork, n)
-
-            do i = 1, n
-               if (piv(i) .ne. i) then ! Do not copy a column if it is already in the right place
-                   ! A(:, piv(i)) = matwork(:, i)
-                   call dcopy(n, matwork(1, i), 1, A(1, piv(i)), 1)
-               endif
-            enddo
-        endsubroutine colpivswap
 
         real(dp) function avgdiag(A, m) result(avg)
             real(dp), intent(in) :: A(m, m)
@@ -1604,7 +1468,7 @@ module stdlinalg
             lwork = 8 * m
             allocate(B(m, m))
             allocate(work(lwork))
-            call copy_matrix(A, B, m)
+            call copy_matrix(B, A)
 
 
             call dgeev('N', 'N', m, B, m, wr, wi, B, m, B, m, work, lwork, info)
@@ -1627,7 +1491,7 @@ module stdlinalg
             lwork = 8 * m
             allocate(B(m, m))
             allocate(work(lwork))
-            call copy_matrix(A, B, m)
+            call copy_matrix(B, A)
 
 
             call dgeev('N', 'V', m, B, m, wr, wi, B, m, V, m, work, lwork, info)
