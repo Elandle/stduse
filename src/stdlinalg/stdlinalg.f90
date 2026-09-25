@@ -594,7 +594,6 @@ module stdlinalg
             real(dp), contiguous, intent(in)    :: D(:)
 
             call right_diagmult_helper(A, D, size(A, 1), size(A, 2))
-
         contains
             subroutine right_diagmult_helper(A, D, m, n)
                 integer , intent(in)    :: m

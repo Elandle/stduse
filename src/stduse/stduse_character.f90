@@ -1,9 +1,18 @@
 submodule(stduse) stduse_character
     implicit none
-
     contains
+        !> \brief Removes leading and trailing blank spaces from an input string.
+        !!
+        !! Example: if `line = "  abc de   "`, then `ltrim(line)` returns
+        !! `"abc de"`.
+        !!
+        !! \param[in] line   (`character(len=*)`)       String to remove leading and trailing blank spaced from.
+        !! \result    ltrim  (`character(len=trimlen)`) `line` with leading and trailing blank spaces removed, with a length `trimlen` of `line` minus the amount of leading and trailing blank spaces.
+        module procedure ltrim
+            ltrim = trim(adjustl(line))
+        endprocedure ltrim
 
-            !> \brief Reads the next line from a file.
+        !> \brief Reads the next line from a file.
         !!
         !! Reminder: in Fortran, files are streams.
         !! So if a line is read from a file (eg, by using the `read` intrinsic)
@@ -48,15 +57,4 @@ submodule(stduse) stduse_character
             read(unit=funit, fmt="(a)", iostat=iostat) line
             line = ltrim(line)
         endprocedure readln
-
-        !> \brief Removes leading and trailing blank spaces from an input string.
-        !!
-        !! Example: if `line = "  abc de   "`, then `ltrim(line)` returns
-        !! `"abc de"`.
-        !!
-        !! \param[in] line   (`character(len=*)`)       String to remove leading and trailing blank spaced from.
-        !! \result    ltrim  (`character(len=trimlen)`) `line` with leading and trailing blank spaces removed, with a length `trimlen` of `line` minus the amount of leading and trailing blank spaces.
-        module procedure ltrim
-            ltrim = trim(adjustl(line))
-        endprocedure ltrim
 endsubmodule stduse_character

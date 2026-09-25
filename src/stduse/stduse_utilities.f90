@@ -1,20 +1,6 @@
 submodule(stduse) stduse_utilities
     implicit none
-
     contains
-
-        module procedure sgn_sp
-            sgn_sp = int(sign(1.0_sp, x))
-        endprocedure sgn_sp
-
-        module procedure sgn_dp
-            sgn_dp = int(sign(1.0_dp, x))
-        endprocedure sgn_dp
-
-        module procedure sgn_i
-            sgn_i = sign(1, x)
-        endprocedure sgn_i
-
         module procedure del
             del = merge(1, 0, i .eq. j)
         endprocedure del
@@ -117,4 +103,16 @@ submodule(stduse) stduse_utilities
         module procedure iscomplex_zp
             val = .not. isclose(aimag(x), 0.0_dp, rtol=rtol, atol=atol)
         endprocedure iscomplex_zp
+
+        module procedure sgn_dp
+            sgn_dp = int(sign(1.0_dp, x))
+        endprocedure sgn_dp
+        
+        module procedure sgn_i
+            sgn_i = sign(1, x)
+        endprocedure sgn_i
+
+        module procedure sgn_sp
+            sgn_sp = int(sign(1.0_sp, x))
+        endprocedure sgn_sp
 endsubmodule stduse_utilities

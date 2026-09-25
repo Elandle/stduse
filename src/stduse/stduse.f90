@@ -162,15 +162,15 @@ module stduse
         endfunction iscomplex_zp
     endinterface iscomplex
     interface sgn
-        pure elemental integer module function sgn_sp(x)
-            real(sp), intent(in) :: x
-        endfunction sgn_sp
         pure elemental integer module function sgn_dp(x)
             real(dp), intent(in) :: x
         endfunction sgn_dp
         pure elemental integer module function sgn_i(x)
             integer, intent(in) :: x
         endfunction sgn_i
+        pure elemental integer module function sgn_sp(x)
+            real(sp), intent(in) :: x
+        endfunction sgn_sp
     endinterface sgn
     ! ---------------------------------------------------------------------------------------------
 endmodule stduse
