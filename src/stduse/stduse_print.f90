@@ -1,6 +1,11 @@
 submodule(stduse) stduse_print
     implicit none
 
+    character(len=*), parameter :: dmatrixfmt = "(f17.8)"
+    character(len=*), parameter :: dvectorfmt = "(f17.8)"
+    character(len=*), parameter :: ivectorfmt = "(i6)"
+    character(len=*), parameter :: imatrixfmt = "(i6)"
+
     contains
 
         module procedure print_dvector
