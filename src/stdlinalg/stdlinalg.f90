@@ -2,6 +2,24 @@ module stdlinalg
     use stduse
     implicit none
 
+
+    interface right_diagmult
+        module subroutine right_diagmult_dp(A, D)
+            real(dp), contiguous, intent(inout) :: A(:, :)
+            real(dp), contiguous, intent(in)    :: D(:)
+        endsubroutine right_diagmult_dp
+    endinterface right_diagmult
+
+
+    interface twonorm
+        module function twonorm_dp(A) result(norm)
+            real(dp), intent(in)  :: A(:, :)
+            real(dp) :: norm
+        endfunction twonorm_dp
+    endinterface twonorm
+
+
+
     interface alloc_matrixswap
         module procedure alloc_matrixswap_dp
     endinterface alloc_matrixswap
@@ -547,68 +565,7 @@ module stdlinalg
 
     contains
 
-        real(dp) function twonorm(A) result(norm)
-            !
-            ! Returns the 2 norm of the matrix A
-            !
-            real(dp), intent(in)  :: A(:, :)
-            real(dp), allocatable :: B(:, :)
-            real(dp), allocatable :: S(:)
-            real(dp), allocatable :: work(:)
-            integer               :: m
-            integer               :: n
-            integer               :: lwork
-            integer               :: info
-            
-            m = size(A, 1)
-            n = size(A, 2)
-            lwork = 5 * (3 * min(m, n) + max(m, n) + 5 * min(m, n))
 
-            allocate(B(m, n))
-            allocate(S(min(m, n)))
-            allocate(work(lwork))
-
-            call dlacpy('A', m, n, A, m, B, m)
-            call dgesvd('N', 'N', m, n, B, m, S, work, lwork, work, lwork, work, lwork, info)
-
-            norm = S(1) 
-        endfunction twonorm
-
-
-
-        !> \brief Updates \f$A = AD\f$ for a square matrix \f$A\f$ and diagonal matrix \f$D\f$ stored as a vector.
-        !!
-        !! \param[inout] A (`real(dp), dimension(n, n)`) \f$n\times n\f$ matrix \f$A\f$ to update.
-        !! \param[in]    D (`real(dp), dimension(n)`)    Diagonal matrix \f$D\f$ stored as a vector.
-        !! \param[in]    n (`integer`)                   Dimension of \f$A\f$ and \f$D\f$.
-        !! \see Todo: maybe change the `do` to a `do concurrent`?
-        subroutine right_diagmult(A, D)
-            !
-            ! Updates:
-            !
-            ! A = A * diag(D)
-            !
-            ! where A is an m x n matrix and D is an n-long vector.
-            !
-            real(dp), contiguous, intent(inout) :: A(:, :)
-            real(dp), contiguous, intent(in)    :: D(:)
-
-            call right_diagmult_helper(A, D, size(A, 1), size(A, 2))
-        contains
-            subroutine right_diagmult_helper(A, D, m, n)
-                integer , intent(in)    :: m
-                integer , intent(in)    :: n
-                real(dp), intent(inout) :: A(m, n)
-                real(dp), intent(in)    :: D(n)
-
-                integer :: i
-
-                ! Scale column i of A by D(i)
-                do i = 1, n
-                    call dscal(m, D(i), A(1, i), 1)
-                enddo
-            endsubroutine right_diagmult_helper
-        endsubroutine right_diagmult
 
         !> \brief Updates \f$A = DA\f$ for a square matrix \f$A\f$ and diagonal matrix \f$D\f$ stored as a vector.
         !!
