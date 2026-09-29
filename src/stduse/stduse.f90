@@ -1,5 +1,5 @@
 module stduse
-    use iso_fortran_env, only: real32, real64, input_unit, output_unit, iostat_end
+    use, intrinsic :: iso_fortran_env, only: real32, real64, input_unit, output_unit, iostat_end
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_is_finite
     implicit none
     private
