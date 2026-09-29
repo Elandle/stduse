@@ -345,6 +345,37 @@ module stdlinalg
             endsubroutine append_column_dp
         endinterface append_column
 
+        interface lu
+            module subroutine lu_dp(A, piv)
+                real(dp), contiguous, intent(inout) :: A(:, :)
+                integer,  contiguous, intent(out)   :: piv(:)
+            endsubroutine lu_dp
+        endinterface lu
+
+        interface pivsgn
+            module function pivsgn(piv, pivl) result(sgn)
+                integer, intent(in)           :: piv(:)
+                integer, intent(in), optional :: pivl
+                integer :: sgn
+            endfunction pivsgn
+        endinterface pivsgn
+
+        interface ludet
+            module function ludet_dp(A, piv) result(det)
+                real(dp), intent(in) :: A(:, :)
+                integer,  intent(in) :: piv(:)
+                real(dp) :: det
+            endfunction ludet_dp
+        endinterface ludet
+
+        interface luinv
+            module subroutine luinv_dp(A, piv, work)
+                real(dp), contiguous, intent(inout) :: A(:, :)
+                integer , contiguous, intent(in)    :: piv(:)
+                real(dp), contiguous, intent(out)   :: work(:)
+            endsubroutine luinv_dp
+        endinterface luinv
+
 
 
 
@@ -501,8 +532,7 @@ module stdlinalg
     ! Linear solve, AX = B --------------------------------------------------------------------------------
 
     interface
-        subroutine dgetrf(m   , n, a, lda, ipiv,   &
-                          info)
+        subroutine dgetrf(m, n, a, lda, ipiv, info)
             import                  :: dp
             integer , intent(in)    :: m
             integer , intent(in)    :: n
@@ -527,8 +557,7 @@ module stdlinalg
     endinterface
 
     interface
-        subroutine dgetri(n    , a   , lda, ipiv, work,    &
-                          lwork, info)
+        subroutine dgetri(n, a, lda, ipiv, work, lwork, info)
             import                  :: dp
             integer , intent(in)    :: n
             real(dp), intent(inout) :: a(lda, *)

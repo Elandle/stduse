@@ -333,6 +333,26 @@ submodule(stdlinalg) stdlinalg_permutation
             !
         endprocedure dlaswpc
 
+        ! Computes the sign of a piv permutation.
+        module procedure pivsgn
+            integer :: apivl, i
+
+            if (present(pivl)) then
+                apivl = pivl
+            else
+                apivl = size(piv)
+            endif
+
+            if ((apivl .gt. size(piv)) .or. (apivl .lt. 0)) then
+                error stop "invalid pivl"
+            endif
+
+            sgn = 1
+            do i = 1, apivl
+                if (piv(i) .ne. i) sgn = -sgn
+            enddo
+        endprocedure pivsgn
+
 
 
 

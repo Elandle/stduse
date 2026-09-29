@@ -88,5 +88,86 @@ submodule(stdlinalg) stdlinalg_lu
             enddo
         endprocedure determinant_zp
 
+        module procedure lu_dp
+            integer :: m, n, lpiv, info
+
+            m = size(A, 1) ; n = size(A, 2) ; lpiv = size(piv) ; info = 0
+
+            ! Make sure piv can hold all pivots.
+            if (lpiv .lt. min(m, n)) then
+                error stop "piv array must have length at least min(size(A, 1), size(A, 2))"
+            end if
+
+            ! Make sure A is actually a matrix.
+            if ((m .eq. 0) .or. (n .eq. 0)) return
+
+            ! PA = LU factorize A.
+            call dgetrf(m, n, A, m, piv, info)
+
+            ! Check for an LAPACK error.
+            if (info .ne. 0) then
+                block
+                    character(len=128) :: errmsg
+                    write(errmsg, "(a, i0)") "lapack dgetrf call failed with info = ", info
+                    error stop trim(errmsg)
+                endblock
+            endif
+        endprocedure lu_dp
+
+        module procedure ludet_dp
+            integer  :: m, n, i
+
+            m = size(A, 1) ; n = size(A, 2)
+
+            if (m .ne. n) then
+                error stop "input is not square."
+            endif
+
+            if (size(piv) < m) then
+                error stop "piv array must have length at least the same size as A."
+            end if
+
+            det = real(pivsgn(piv, n), dp)
+            do i = 1, n
+                det = det * A(i, i)
+            enddo
+        endprocedure ludet_dp
+
+        module procedure luinv_dp
+            integer :: m, n, lwork, info
+
+            m = size(A, 1) ; n = size(A, 2) ; lwork = size(work) ; info = 0
+
+            ! Make sure A is square.
+            if (m .ne. n) then
+                error stop "input matrix is not square."
+            end if
+
+            ! Make sure piv length matches the dimension of A.
+            if (size(piv) .lt. m) then
+                error stop "piv dimension is not at least as long as the dimension of A."
+            end if
+
+            ! Make sure matrix is not trivial.
+            if (m .eq.0) return
+
+            ! dgetri requires a workspace at least m long.
+            if (lwork .lt. m) then
+                error stop "work array is not long enough."
+            end if
+
+            ! Invert the PA = LU factorization stored in A and piv.
+            call dgetri(m, A, m, piv, work, lwork, info)
+
+            ! Check for an LAPACK error.
+            if (info .ne. 0) then
+                block
+                    character(len=128) :: errmsg
+                    write(errmsg, "(a, i0)") "lapack dgetri call failed with info = ", info
+                    error stop trim(errmsg)
+                endblock
+            endif
+        end procedure luinv_dp
+
 
 endsubmodule stdlinalg_lu
