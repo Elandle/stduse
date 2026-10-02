@@ -95,8 +95,9 @@ submodule(stdlinalg) stdlinalg_lu
 
             ! Make sure piv can hold all pivots.
             if (lpiv .lt. min(m, n)) then
-                error stop "piv array must have length at least min(size(A, 1), size(A, 2))"
-            end if
+                error stop "error stop in procedure lu_dp from submodule stdlinalg_lu of module &
+                           &linalg: piv array must have length at least min(size(A, 1), size(A, 2))."
+            endif
 
             ! Make sure A is actually a matrix.
             if ((m .eq. 0) .or. (n .eq. 0)) return
