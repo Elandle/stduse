@@ -135,6 +135,27 @@ submodule(stdlinalg) stdlinalg_utilities
             call move_alloc(temp, A)
         endsubroutine append_column_dp
 
+        module procedure issymmetric_dp
+            integer :: m, n, i, j
+
+            m = size(A, 1) ; n = size(A, 2)
+
+            ! Make sure A is square.
+            if (m .ne. n) then
+                sym = .false.
+                return
+            endif
+
+            do j = 1, n
+                do i = 1, m
+                    if (A(i, j) .ne. A(j, i)) then
+                        sym = .false.
+                        return
+                    endif
+                enddo
+            enddo
+        endprocedure issymmetric_dp
+
 
 
 endsubmodule stdlinalg_utilities

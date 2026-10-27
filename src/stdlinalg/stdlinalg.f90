@@ -345,6 +345,14 @@ module stdlinalg
             endsubroutine append_column_dp
         endinterface append_column
 
+
+        interface issymmetric
+            module function issymmetric_dp(A) result(sym)
+                real(dp), intent(in) :: A(:, :)
+                logical :: sym
+            endfunction issymmetric_dp
+        endinterface issymmetric
+
         interface lu
             module subroutine lu_dp(A, piv)
                 real(dp), contiguous, intent(inout) :: A(:, :)
